@@ -1,88 +1,81 @@
 
 import { useState } from 'react';
+
+import { Square } from './components/Square';
+import { WinnerModal } from './components/WinnerModal';
+import { Board } from './components/Board';
+
 import './App.css'
-
-const TURNS = {
-    X:'x',
-    O: 'o'
-}
-
-
-const Square = ({children, isSelected, updateBoard, index}) => {
-
-    const className = isSelected ? "is-selected" : "";
-
-    const handlerOnClick = (index)=>{
-        updateBoard(index);
-    }
-
-    return(
-        <div 
-            className={`square ${className}`}
-            onClick={()=>{handlerOnClick(index)}}
-        >
-            {children}
-        </div>
-    );
-};
-
-const newTurn = (activeTurn) => {
-    
-    return( activeTurn === TURNS.X ? TURNS.O : TURNS.X );
-    
-}
-
+import confetti from 'canvas-confetti';
+import { TURNS } from './constants';
+import { checkWinner,newTurn,keepPlaying } from './logic/board';
+import { Turn } from './components/Turn';
+import { saveGame, readGame, deleteGame } from './logic/storage';
 
 function App() {
 
-    const [board,setBoard] = useState(Array(9).fill(null));
-    const [turn,setTurn] = useState(TURNS.X);
+    const [board,setBoard] = useState(()=>{
+        const boardFromStorage = readGame('board')   
+        if(boardFromStorage) return boardFromStorage
+        return Array(9).fill(null)
+    })
+    const [turn,setTurn] = useState(()=>{
+        const turnFromStorage = readGame('turn') 
+        if(turnFromStorage) return turnFromStorage
+        return TURNS.X
+    });
+    const [winner,setWinner] = useState(null);   // null: no hay ganador, false: empate, si hay ganador es X u O
+
+    const resetGame = () =>{
+        setBoard(Array(9).fill(null))
+        setTurn(TURNS.X)
+        setWinner(null)
+        deleteGame()
+    }
 
     const updateBoard = (index) => {
-        const newBoard = [...board];
-        newBoard[index] = turn;
-        setBoard(newBoard);
-        setTurn(newTurn(turn)); //(oldState) =>(!oldState)
+        
+        if((winner === null) && !board[index]){ //si el juego no termino y el casillero esta vacio
+            const newBoard = [...board];
+            newBoard[index] = turn;
+            setBoard(newBoard);
+            saveGame('board',newBoard)
+            if (checkWinner(newBoard)){ 
+                setWinner(turn);
+                confetti()
+            }else{
+                //chequeo si es empate              
+                if(!keepPlaying(newBoard)){
+                    setWinner(false);
+                }
+            }
+            setTurn(newTurn(turn)); //(oldState) =>(!oldState)
+            saveGame('turn', newTurn(turn) )
+        }       
     }
 
     return (
         <>
         <main className='board'>
+
                 <h1>TIC TAC TOE</h1>
-                <section className='game'>
-                    {board.map((_,index) =>{
-                        return(
-                            <Square
-                                key={index}
-                                index={index}
-                                updateBoard={updateBoard}
-                            >
-                                {board[index]}
-                            </Square>
-                        )
-                    })
-                    
-                    }
-                </section>
+                <button onClick={resetGame}>Resetear Juego</button>
 
-                <section className='turn'>
+                <Board 
+                    board={board}
+                    updateBoard={updateBoard}
+                />
 
-                    <Square isSelected={turn === TURNS.X}>    
-                        {TURNS.X}
-                    </Square>
-                    
-                    <Square isSelected={turn === TURNS.O}>    
-                        {TURNS.O}
-                    </Square>
+               <Turn turn={turn}/>
 
-                </section>
-
+                <WinnerModal winner={winner} resetGame={resetGame}></WinnerModal>                
         </main>
         </>
     )
 }
-
 export default App
+
+
 
 
 
